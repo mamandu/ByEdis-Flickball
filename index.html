@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flickball - Gemini Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            background: #ffffff;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
+            position: relative;
+        }
+
+        #gameCanvas {
+            display: block;
+            border-radius: 0;
+            cursor: crosshair;
+            box-shadow: 0 0 0 1px #000000;
+        }
+
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25.888px 41.887px; /* Golden ratio: ~26px and ~42px */
+            background: #000000;
+            color: #ffffff;
+            position: relative;
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8.09px; /* Golden ratio subdivision */
+        }
+
+        .player-name {
+            font-size: 11px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .player-a { color: #ffffff; }
+        .player-b { color: #ffffff; }
+
+        .score {
+            font-size: 67.773px; /* Golden ratio scale */
+            font-weight: 300;
+            color: #ffffff;
+            line-height: 1;
+        }
+
+        .turn-indicator {
+            padding: 13.09px 21.18px; /* Golden ratio proportions */
+            background: transparent;
+            border: 1px solid #ffffff;
+            border-radius: 0;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 25.888px; /* Golden ratio spacing */
+            padding: 25.888px;
+            background: #000000;
+        }
+
+        button {
+            padding: 13.09px 21.18px; /* Golden ratio proportions */
+            font-size: 10px;
+            font-weight: 400;
+            border: 1px solid #ffffff;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            box-shadow: none;
+            background: #000000;
+            color: #ffffff;
+        }
+
+        button:hover {
+            transform: none;
+            background: #ffffff;
+            color: #000000;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #resetBtn, #aiBtn, #soundBtn {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .goal-celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle at 35% 35%, #ffffff, #e0e0e0);
+            border-radius: 50%;
+            box-shadow: 
+                inset -10px -10px 30px rgba(0, 0, 0, 0.1),
+                0 20px 60px rgba(0, 0, 0, 0.4);
+            animation: celebrate 1.5s ease-out forwards;
+            pointer-events: none;
+            z-index: 1000;
+            
+            /* Text styling */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 700;
+            color: #000000;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        @keyframes celebrate {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.3);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.5);
+            }
+        }
+
+        .match-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ffffff;
+            padding: 67.773px 109.66px; /* Golden ratio proportions */
+            border: 1px solid #000000;
+            text-align: center;
+            z-index: 1001;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -55%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        .match-over h1 {
+            color: #000000;
+            font-size: 41.887px; /* Golden ratio scale */
+            font-weight: 300;
+            margin-bottom: 25.888px;
+            text-shadow: none;
+            letter-spacing: 2px;
+        }
+
+        .match-over p {
+            color: #000000;
+            font-size: 16px;
+            margin-bottom: 41.887px;
+            font-weight: 300;
+        }
+
+        .match-over button {
+            padding: 16px 25.888px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="hud">
+            <div class="player-info">
+                <div class="player-name player-a">PLAYER A</div>
+                <div class="score" id="scoreA">0</div>
+            </div>
+            <div class="turn-indicator" id="turnIndicator">Player A's Turn</div>
+            <div class="player-info">
+                <div class="player-name player-b">PLAYER B</div>
+                <div class="score" id="scoreB">0</div>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="1000" height="600"></canvas>
+        <div id="controls">
+            <button id="resetBtn">🔄 New Match</button>
+            <button id="aiBtn">🤖 vs AI</button>
+            <button id="soundBtn">🔊 Sound On</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Constants
+        const CONSTANTS = {
+            width: 1000,
+            height: 600,
+            padding: 20,
+            goalWidth: 160,
+            goalDepth: 40, // Reduced from 60 to match smaller goal
+            nailRadius: 8,
+            marbleRadius: 10,
+            maxDrag: 160,
+            speedPerPx: 0.10,
+            maxShotSpeed: 16,
+            winScore: 10,
+            friction: 0.985,
+            wallBounce: 0.8,
+            restThreshold: 0.05,
+            restTime: 500
+        };
+
+        // Game State
+        let gameState = {
+            scoreA: 0,
+            scoreB: 0,
+            currentPlayer: 'A',
+            aiMode: false,
+            soundEnabled: true,
+            isTurnActive: false,
+            goalScoredThisTurn: false,
+            matchOver: false,
+            restAccum: 0,
+            particles: []
+        };
+
+        // Ball object
+        const ball = {
+            x: CONSTANTS.width / 2,
+            y: CONSTANTS.height / 2,
+            vx: 0,
+            vy: 0,
+            radius: CONSTANTS.marbleRadius
+        };
+
+        // Nails (magnetic flick points)
+        const nails = [];
+        const nailPositions = [
+            // Left side
+            [80, 300], [160, 200], [160, 400],
+            [380, 150], [380, 300], [380, 450],
+            // Right side
+            [920, 300], [840, 200], [840, 400],
+            [620, 150], [620, 300], [620, 450]
+        ];
+
+        nailPositions.forEach(([x, y]) => {
+            nails.push({ x, y, radius: CONSTANTS.nailRadius });
+        });
+
+        // Aiming state
+        let isAiming = false;
+        let aimStart = { x: 0, y: 0 };
+
+        // Particle system for confetti effects
+        class Particle {
+            constructor(x, y, color, vx = 0, vy = 0) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx || (Math.random() - 0.5) * 6;
+                this.vy = vy || (Math.random() - 0.5) * 6 - 2;
+                this.life = 1;
+                this.decay = 0.015;
+                this.size = Math.random() * 5 + 3; // Bigger confetti pieces
+                this.color = color;
+                this.gravity = 0.2;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.2;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += this.gravity;
+                this.vx *= 0.99; // Air resistance
+                this.life -= this.decay;
+                this.rotation += this.rotationSpeed;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                // Draw confetti as rectangles
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+                
+                ctx.restore();
+            }
+        }
+
+        function addParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                gameState.particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // Draw background gradient
+        function drawBackground() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, CONSTANTS.height);
+            gradient.addColorStop(0, '#6b4a2f');
+            gradient.addColorStop(0.5, '#8a5d3b');
+            gradient.addColorStop(1, '#6b4a2f');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CONSTANTS.width, CONSTANTS.height);
+        }
+
+        // Draw pitch markings
+        function drawPitchLines() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+
+            // Center line
+            ctx.beginPath();
+            ctx.moveTo(CONSTANTS.width / 2, CONSTANTS.padding);
+            ctx.lineTo(CONSTANTS.width / 2, CONSTANTS.height - CONSTANTS.padding);
+            ctx.stroke();
+
+            // Center circle
+            ctx.beginPath();
+            ctx.arc(CONSTANTS.width / 2, CONSTANTS.height / 2, 70, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Center spot
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.arc(CONSTANTS.width / 2, CONSTANTS.height / 2, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Penalty boxes
+            const boxWidth = 160;
+            const boxHeight = 320;
+            const boxY = (CONSTANTS.height - boxHeight) / 2;
+
+            ctx.strokeRect(CONSTANTS.padding, boxY, boxWidth, boxHeight);
+            ctx.strokeRect(CONSTANTS.width - CONSTANTS.padding - boxWidth, boxY, boxWidth, boxHeight);
+
+            // Goal boxes
+            const goalBoxWidth = 60;
+            const goalBoxHeight = 180;
+            const goalBoxY = (CONSTANTS.height - goalBoxHeight) / 2;
+
+            ctx.strokeRect(CONSTANTS.padding, goalBoxY, goalBoxWidth, goalBoxHeight);
+            ctx.strokeRect(CONSTANTS.width - CONSTANTS.padding - goalBoxWidth, goalBoxY, goalBoxWidth, goalBoxHeight);
+
+            // Corner arcs
+            const r = 30;
+            ctx.beginPath();
+            ctx.arc(CONSTANTS.padding, CONSTANTS.padding, r, 0, Math.PI / 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(CONSTANTS.padding, CONSTANTS.height - CONSTANTS.padding, r, -Math.PI / 2, 0);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(CONSTANTS.width - CONSTANTS.padding, CONSTANTS.padding, r, Math.PI / 2, Math.PI);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(CONSTANTS.width - CONSTANTS.padding, CONSTANTS.height - CONSTANTS.padding, r, Math.PI, -Math.PI / 2);
+            ctx.stroke();
+        }
+
+        // Draw 3D goal nets with proper proportions
+        function drawGoalNets() {
+            // Update ripple animation
+            if (netRipple.active) {
+                netRipple.time += 16;
+                if (netRipple.time >= netRipple.duration) {
+                    netRipple.active = false;
+                }
+            }
+
+            // Left goal (Player B scores here)
+            const leftRipple = netRipple.active && netRipple.side === 'left' ? 
+                Math.sin(netRipple.time / netRipple.duration * Math.PI * 2) * 2 : 0;
+            drawGoalNet(CONSTANTS.padding, CONSTANTS.height / 2, -CONSTANTS.goalDepth, CONSTANTS.goalWidth, leftRipple);
+            
+            // Right goal (Player A scores here)
+            const rightRipple = netRipple.active && netRipple.side === 'right' ? 
+                Math.sin(netRipple.time / netRipple.duration * Math.PI * 2) * 2 : 0;
+            drawGoalNet(CONSTANTS.width - CONSTANTS.padding, CONSTANTS.height / 2, CONSTANTS.goalDepth, CONSTANTS.goalWidth, rightRipple);
+        }
+
+        function drawGoalNet(x, y, depth, width, ripple = 0) {
+            // Simple goal dimensions
+            const goalWidth = 60;  // Width of goal opening
+            const goalHeight = 80; // Height of goal opening
+            const halfW = goalWidth / 2;
+            const halfH = goalHeight / 2;
+            
+            const effectiveDepth = depth + (depth > 0 ? ripple : -ripple);
+
+            ctx.save();
+            ctx.translate(x, y);
+
+            // === GOAL INTERIOR (DARK BACKGROUND) ===
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(
+                Math.min(0, effectiveDepth), 
+                -halfH, 
+                Math.abs(effectiveDepth), 
+                goalHeight
+            );
+
+            // === NET MESH ===
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            
+            // Vertical net lines
+            const verticalLines = 5;
+            for (let i = 0; i <= verticalLines; i++) {
+                const t = i / verticalLines;
+                const xPos = effectiveDepth * t;
+                ctx.beginPath();
+                ctx.moveTo(xPos, -halfH);
+                ctx.lineTo(xPos, halfH);
+                ctx.stroke();
+            }
+            
+            // Horizontal net lines
+            const horizontalLines = 7;
+            for (let i = 0; i <= horizontalLines; i++) {
+                const t = i / horizontalLines;
+                const yPos = -halfH + goalHeight * t;
+                ctx.beginPath();
+                ctx.moveTo(0, yPos);
+                ctx.lineTo(effectiveDepth, yPos);
+                ctx.stroke();
+            }
+
+            // === GOAL POSTS (WHITE FRAME) ===
+            
+            // Shadow
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.lineWidth = 10;
+            ctx.lineJoin = 'round';
+            ctx.strokeRect(2, -halfH + 2, 0, goalHeight);
+
+            // Main frame
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            ctx.lineJoin = 'miter';
+            ctx.strokeRect(0, -halfH, 0, goalHeight);
+
+            // Post corners
+            ctx.fillStyle = '#ffffff';
+            const cornerSize = 4;
+            ctx.fillRect(-cornerSize/2, -halfH - cornerSize/2, cornerSize, cornerSize); // Top left
+            ctx.fillRect(-cornerSize/2, halfH - cornerSize/2, cornerSize, cornerSize);   // Bottom left
+            ctx.fillRect(-cornerSize/2, -halfH - cornerSize/2, cornerSize, cornerSize); // Top right  
+            ctx.fillRect(-cornerSize/2, halfH - cornerSize/2, cornerSize, cornerSize);   // Bottom right
+
+            ctx.restore();
+        }
+
+        // Draw field borders
+        function drawBorders() {
+            const goalHeight = 80; // Match goal size
+            const segH = (CONSTANTS.height - goalHeight) / 2;
+            
+            ctx.strokeStyle = '#CC9A66';
+            ctx.lineWidth = CONSTANTS.padding;
+
+            // Top and bottom borders
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(CONSTANTS.width, 0);
+            ctx.moveTo(0, CONSTANTS.height);
+            ctx.lineTo(CONSTANTS.width, CONSTANTS.height);
+            ctx.stroke();
+
+            // Side borders (with gaps for goals)
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, segH);
+            ctx.moveTo(0, CONSTANTS.height - segH);
+            ctx.lineTo(0, CONSTANTS.height);
+            
+            ctx.moveTo(CONSTANTS.width, 0);
+            ctx.lineTo(CONSTANTS.width, segH);
+            ctx.moveTo(CONSTANTS.width, CONSTANTS.height - segH);
+            ctx.lineTo(CONSTANTS.width, CONSTANTS.height);
+            ctx.stroke();
+        }
+
+        // Draw nails
+        function drawNails() {
+            nails.forEach(nail => {
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.arc(nail.x + 2, nail.y + 2, nail.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Main nail body
+                ctx.fillStyle = '#333333';
+                ctx.beginPath();
+                ctx.arc(nail.x, nail.y, nail.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Border
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Highlight
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                ctx.beginPath();
+                ctx.arc(nail.x - 3, nail.y - 3, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Draw ball - simple white sphere
+        function drawBall() {
+            // Shadow
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(ball.x + 3, ball.y + 3, ball.radius, ball.radius * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Ball trail
+            if (Math.abs(ball.vx) > 1 || Math.abs(ball.vy) > 1) {
+                ctx.save();
+                ctx.globalAlpha = 0.3;
+                for (let i = 1; i <= 3; i++) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(
+                        ball.x - ball.vx * i * 2,
+                        ball.y - ball.vy * i * 2,
+                        ball.radius * (1 - i * 0.2),
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // Main ball - white with subtle gradient
+            const gradient = ctx.createRadialGradient(
+                ball.x - ball.radius / 3,
+                ball.y - ball.radius / 3,
+                ball.radius / 4,
+                ball.x,
+                ball.y,
+                ball.radius
+            );
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(1, '#e0e0e0');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Subtle outline
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Highlight for 3D effect
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.beginPath();
+            ctx.arc(ball.x - ball.radius / 3, ball.y - ball.radius / 3, ball.radius / 3.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw aim line
+        function drawAimLine() {
+            if (!isAiming) return;
+
+            const dx = aimStart.x - ball.x;
+            const dy = aimStart.y - ball.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > 5) {
+                const clampedDist = Math.min(dist, CONSTANTS.maxDrag);
+                const power = clampedDist / CONSTANTS.maxDrag;
+
+                // Arrow line
+                ctx.save();
+                ctx.strokeStyle = `rgba(255, 215, 0, ${0.6 + power * 0.4})`;
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 5]);
+
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                ctx.lineTo(aimStart.x, aimStart.y);
+                ctx.stroke();
+
+                // Arrow head
+                const angle = Math.atan2(dy, dx);
+                ctx.fillStyle = `rgba(255, 215, 0, ${0.6 + power * 0.4})`;
+                ctx.beginPath();
+                ctx.moveTo(aimStart.x, aimStart.y);
+                ctx.lineTo(
+                    aimStart.x - 20 * Math.cos(angle - Math.PI / 6),
+                    aimStart.y - 20 * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.lineTo(
+                    aimStart.x - 20 * Math.cos(angle + Math.PI / 6),
+                    aimStart.y - 20 * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.closePath();
+                ctx.fill();
+
+                // Power bar
+                const barWidth = 200;
+                const barHeight = 20;
+                const barX = CONSTANTS.width / 2 - barWidth / 2;
+                const barY = 20;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(barX - 2, barY - 2, barWidth + 4, barHeight + 4);
+
+                const powerColor = power < 0.3 ? '#4CAF50' : power < 0.7 ? '#FFC107' : '#F44336';
+                ctx.fillStyle = powerColor;
+                ctx.fillRect(barX, barY, barWidth * power, barHeight);
+
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+                // Power percentage
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${Math.round(power * 100)}%`, CONSTANTS.width / 2, barY - 10);
+
+                ctx.restore();
+            }
+        }
+
+        // Update ball physics
+        function updateBall() {
+            // Apply velocity
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Apply friction
+            ball.vx *= CONSTANTS.friction;
+            ball.vy *= CONSTANTS.friction;
+
+            // Wall collisions with goal gaps
+            const goalHeight = 80;
+            const goalTop = CONSTANTS.height / 2 - goalHeight / 2;
+            const goalBottom = CONSTANTS.height / 2 + goalHeight / 2;
+
+            // Left wall (with goal)
+            if (ball.x - ball.radius < CONSTANTS.padding) {
+                if (ball.y < goalTop || ball.y > goalBottom) {
+                    ball.vx *= -CONSTANTS.wallBounce;
+                    ball.x = CONSTANTS.padding + ball.radius;
+                    playSound('bounce');
+                }
+            }
+
+            // Right wall (with goal)
+            if (ball.x + ball.radius > CONSTANTS.width - CONSTANTS.padding) {
+                if (ball.y < goalTop || ball.y > goalBottom) {
+                    ball.vx *= -CONSTANTS.wallBounce;
+                    ball.x = CONSTANTS.width - CONSTANTS.padding - ball.radius;
+                    playSound('bounce');
+                }
+            }
+
+            // Back wall of LEFT GOAL (stops ball from going through)
+            if (ball.x - ball.radius < CONSTANTS.padding - CONSTANTS.goalDepth && 
+                ball.y > goalTop && ball.y < goalBottom) {
+                ball.vx *= -0.3; // Less bounce, more realistic
+                ball.x = CONSTANTS.padding - CONSTANTS.goalDepth + ball.radius;
+                playSound('bounce');
+            }
+
+            // Back wall of RIGHT GOAL (stops ball from going through)
+            if (ball.x + ball.radius > CONSTANTS.width - CONSTANTS.padding + CONSTANTS.goalDepth && 
+                ball.y > goalTop && ball.y < goalBottom) {
+                ball.vx *= -0.3; // Less bounce, more realistic
+                ball.x = CONSTANTS.width - CONSTANTS.padding + CONSTANTS.goalDepth - ball.radius;
+                playSound('bounce');
+            }
+
+            // Side walls inside LEFT GOAL (top and bottom of goal opening)
+            if (ball.x < CONSTANTS.padding && ball.x > CONSTANTS.padding - CONSTANTS.goalDepth) {
+                // Top side of left goal
+                if (ball.y - ball.radius < goalTop && ball.y > goalTop - 20) {
+                    ball.vy *= -0.3;
+                    ball.y = goalTop + ball.radius;
+                    playSound('bounce');
+                }
+                // Bottom side of left goal
+                if (ball.y + ball.radius > goalBottom && ball.y < goalBottom + 20) {
+                    ball.vy *= -0.3;
+                    ball.y = goalBottom - ball.radius;
+                    playSound('bounce');
+                }
+            }
+
+            // Side walls inside RIGHT GOAL (top and bottom of goal opening)
+            if (ball.x > CONSTANTS.width - CONSTANTS.padding && ball.x < CONSTANTS.width - CONSTANTS.padding + CONSTANTS.goalDepth) {
+                // Top side of right goal
+                if (ball.y - ball.radius < goalTop && ball.y > goalTop - 20) {
+                    ball.vy *= -0.3;
+                    ball.y = goalTop + ball.radius;
+                    playSound('bounce');
+                }
+                // Bottom side of right goal
+                if (ball.y + ball.radius > goalBottom && ball.y < goalBottom + 20) {
+                    ball.vy *= -0.3;
+                    ball.y = goalBottom - ball.radius;
+                    playSound('bounce');
+                }
+            }
+
+            // Top and bottom walls
+            if (ball.y - ball.radius < CONSTANTS.padding) {
+                ball.vy *= -CONSTANTS.wallBounce;
+                ball.y = CONSTANTS.padding + ball.radius;
+                playSound('bounce');
+            }
+
+            if (ball.y + ball.radius > CONSTANTS.height - CONSTANTS.padding) {
+                ball.vy *= -CONSTANTS.wallBounce;
+                ball.y = CONSTANTS.height - CONSTANTS.padding - ball.radius;
+                playSound('bounce');
+            }
+
+            // Nail collisions
+            nails.forEach(nail => {
+                const dx = ball.x - nail.x;
+                const dy = ball.y - nail.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < ball.radius + nail.radius) {
+                    // Collision response
+                    const angle = Math.atan2(dy, dx);
+                    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                    
+                    ball.vx = Math.cos(angle) * speed * 0.7;
+                    ball.vy = Math.sin(angle) * speed * 0.7;
+                    
+                    // Separate ball from nail
+                    const overlap = ball.radius + nail.radius - dist;
+                    ball.x += Math.cos(angle) * overlap;
+                    ball.y += Math.sin(angle) * overlap;
+                    
+                    playSound('bounce');
+                }
+            });
+
+            // Check goals
+            checkGoals();
+
+            // Stop if too slow
+            const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+            if (speed < 0.05) {
+                ball.vx = 0;
+                ball.vy = 0;
+            }
+        }
+
+        // Check if ball entered goal
+        function checkGoals() {
+            // Goals are 60px wide, 80px tall, centered on midline
+            const goalWidth = 60;
+            const goalHeight = 80;
+            const goalTop = CONSTANTS.height / 2 - goalHeight / 2;
+            const goalBottom = CONSTANTS.height / 2 + goalHeight / 2;
+
+            // Left goal is Player A's goal - Player B scores when half the ball crosses the goal line (x=20)
+            // Half the ball crosses when ball.x < CONSTANTS.padding + ball.radius/2
+            if (ball.x < CONSTANTS.padding + ball.radius / 2 && ball.y > goalTop && ball.y < goalBottom) {
+                if (ball.vx < 0 && !gameState.goalScoredThisTurn) {
+                    handleGoal('B'); // Player B scores in left goal
+                }
+            }
+
+            // Right goal is Player B's goal - Player A scores when half the ball crosses the goal line (x=980)
+            // Half the ball crosses when ball.x > CONSTANTS.width - CONSTANTS.padding - ball.radius/2
+            if (ball.x > CONSTANTS.width - CONSTANTS.padding - ball.radius / 2 && ball.y > goalTop && ball.y < goalBottom) {
+                if (ball.vx > 0 && !gameState.goalScoredThisTurn) {
+                    handleGoal('A'); // Player A scores in right goal
+                }
+            }
+        }
+
+        // Net ripple animation state
+        let netRipple = {
+            active: false,
+            side: null,
+            time: 0,
+            duration: 800
+        };
+
+        // Handle goal scored
+        function handleGoal(scorer) {
+            if (gameState.matchOver || gameState.goalScoredThisTurn) return;
+            
+            gameState.goalScoredThisTurn = true;
+
+            if (scorer === 'A') {
+                gameState.scoreA++;
+                document.getElementById('scoreA').textContent = gameState.scoreA;
+                netRipple.side = 'left';
+            } else {
+                gameState.scoreB++;
+                document.getElementById('scoreB').textContent = gameState.scoreB;
+                netRipple.side = 'right';
+            }
+
+            // Trigger net ripple animation
+            netRipple.active = true;
+            netRipple.time = 0;
+
+            showCelebration(`Goooooal!`);
+            
+            // Colorful confetti explosion!
+            const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739'];
+            for (let i = 0; i < 50; i++) {
+                const color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 8 + 4;
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed - Math.random() * 3;
+                gameState.particles.push(new Particle(ball.x, ball.y, color, vx, vy));
+            }
+            
+            playSound('goal');
+
+            // Flash effect on goal
+            const flashCount = 3;
+            for (let i = 0; i < flashCount; i++) {
+                setTimeout(() => {
+                    const flashColors = ['#FFD700', '#FF1493', '#00CED1', '#FF4500', '#9370DB'];
+                    for (let j = 0; j < 15; j++) {
+                        const color = flashColors[Math.floor(Math.random() * flashColors.length)];
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 6 + 2;
+                        const vx = Math.cos(angle) * speed;
+                        const vy = Math.sin(angle) * speed - 2;
+                        const x = scorer === 'A' ? CONSTANTS.padding : CONSTANTS.width - CONSTANTS.padding;
+                        gameState.particles.push(new Particle(x, CONSTANTS.height / 2, color, vx, vy));
+                    }
+                }, i * 200);
+            }
+
+            setTimeout(() => {
+                if (gameState.scoreA >= CONSTANTS.winScore) {
+                    endMatch('A');
+                } else if (gameState.scoreB >= CONSTANTS.winScore) {
+                    endMatch('B');
+                } else {
+                    resetBall();
+                    gameState.currentPlayer = scorer === 'A' ? 'B' : 'A';
+                    updateTurnIndicator();
+                    gameState.isTurnActive = false;
+                    gameState.goalScoredThisTurn = false;
+                    gameState.restAccum = 0;
+                    netRipple.active = false;
+                }
+            }, 2000);
+        }
+
+        // Show goal celebration
+        function showCelebration(message) {
+            const celebration = document.createElement('div');
+            celebration.className = 'goal-celebration';
+            celebration.textContent = message;
+            document.body.appendChild(celebration);
+
+            setTimeout(() => {
+                celebration.remove();
+            }, 1500);
+        }
+
+        // End match
+        function endMatch(winner) {
+            gameState.matchOver = true;
+            
+            const matchOverDiv = document.createElement('div');
+            matchOverDiv.className = 'match-over';
+            matchOverDiv.innerHTML = `
+                <h1>🏆 Player ${winner} Wins! 🏆</h1>
+                <p>Final Score: ${gameState.scoreA} - ${gameState.scoreB}</p>
+                <button onclick="location.reload()">Play Again</button>
+            `;
+            document.body.appendChild(matchOverDiv);
+        }
+
+        // Reset ball to center
+        function resetBall() {
+            ball.x = CONSTANTS.width / 2;
+            ball.y = CONSTANTS.height / 2;
+            ball.vx = 0;
+            ball.vy = 0;
+        }
+
+        // Update turn indicator
+        function updateTurnIndicator() {
+            const indicator = document.getElementById('turnIndicator');
+            indicator.textContent = `Player ${gameState.currentPlayer}'s Turn`;
+        }
+
+        // Update particles
+        function updateParticles() {
+            gameState.particles = gameState.particles.filter(p => p.life > 0);
+            gameState.particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+        }
+
+        // Sound system
+        function playSound(type) {
+            if (!gameState.soundEnabled) return;
+
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const audioContext = new AudioContext();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                switch (type) {
+                    case 'flick':
+                        oscillator.frequency.value = 440;
+                        gainNode.gain.value = 0.1;
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.1);
+                        break;
+                    case 'bounce':
+                        oscillator.frequency.value = 220;
+                        gainNode.gain.value = 0.05;
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.05);
+                        break;
+                    case 'goal':
+                        oscillator.frequency.value = 880;
+                        gainNode.gain.value = 0.2;
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.4);
+                        break;
+                }
+            } catch (e) {
+                console.warn('Audio failed', e);
+            }
+        }
+
+        // AI logic
+        function performAIMove() {
+            if (gameState.currentPlayer !== 'B' || !gameState.aiMode) return;
+            if (gameState.isTurnActive || gameState.matchOver) return;
+
+            const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+            if (speed > CONSTANTS.restThreshold) return;
+
+            // Find best nail to flick from (closest to ball on right side)
+            const rightNails = nails.filter(n => n.x > CONSTANTS.width / 2);
+            let bestNail = rightNails[0];
+            let minDist = Infinity;
+
+            rightNails.forEach(nail => {
+                const dist = Math.hypot(ball.x - nail.x, ball.y - nail.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    bestNail = nail;
+                }
+            });
+
+            // Aim towards left goal
+            const targetX = CONSTANTS.padding;
+            const targetY = CONSTANTS.height / 2;
+
+            const dx = targetX - ball.x;
+            const dy = targetY - ball.y;
+            const angle = Math.atan2(dy, dx);
+
+            const power = 0.7 + Math.random() * 0.3;
+            const speed2 = power * CONSTANTS.maxShotSpeed;
+
+            ball.vx = Math.cos(angle) * speed2;
+            ball.vy = Math.sin(angle) * speed2;
+
+            gameState.isTurnActive = true;
+            gameState.goalScoredThisTurn = false;
+            gameState.restAccum = 0;
+
+            playSound('flick');
+        }
+
+        // Mouse/touch handlers
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX || e.touches[0].clientX) - rect.left,
+                y: (e.clientY || e.touches[0].clientY) - rect.top
+            };
+        }
+
+        // Prevent right-click context menu on canvas
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('touchstart', handlePointerDown);
+
+        function handlePointerDown(e) {
+            e.preventDefault();
+            
+            // Left-click (button 0) to aim, or touch to aim
+            if (e.button === 0 || e.touches) {
+                if (gameState.matchOver || gameState.isTurnActive || gameState.goalScoredThisTurn) return;
+                if (gameState.aiMode && gameState.currentPlayer === 'B') return;
+
+                const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                if (speed > CONSTANTS.restThreshold) return;
+
+                const pos = getMousePos(e);
+                const dist = Math.hypot(pos.x - ball.x, pos.y - ball.y);
+
+                if (dist <= ball.radius + 24) {
+                    isAiming = true;
+                    aimStart = pos;
+                }
+            }
+            
+            // Right-click (button 2) to release when aiming
+            if (e.button === 2 && isAiming) {
+                handlePointerUp(e);
+            }
+        }
+
+        canvas.addEventListener('mousemove', handlePointerMove);
+        canvas.addEventListener('touchmove', handlePointerMove);
+
+        function handlePointerMove(e) {
+            e.preventDefault();
+            if (isAiming) {
+                aimStart = getMousePos(e);
+            }
+        }
+
+        canvas.addEventListener('mouseup', handlePointerUp);
+        canvas.addEventListener('touchend', handlePointerUp);
+
+        function handlePointerUp(e) {
+            e.preventDefault();
+            if (!isAiming) return;
+
+            const dx = ball.x - aimStart.x;
+            const dy = ball.y - aimStart.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > 5) {
+                const clampedDist = Math.min(dist, CONSTANTS.maxDrag);
+                const power = clampedDist / CONSTANTS.maxDrag;
+                const speed = power * CONSTANTS.maxShotSpeed;
+
+                const angle = Math.atan2(dy, dx);
+                ball.vx = Math.cos(angle) * speed;
+                ball.vy = Math.sin(angle) * speed;
+
+                gameState.isTurnActive = true;
+                gameState.goalScoredThisTurn = false;
+                gameState.restAccum = 0;
+
+                playSound('flick');
+            }
+
+            isAiming = false;
+        }
+
+        // Button handlers
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            location.reload();
+        });
+
+        document.getElementById('aiBtn').addEventListener('click', function() {
+            gameState.aiMode = !gameState.aiMode;
+            this.textContent = gameState.aiMode ? '🤖 AI: ON' : '🤖 vs AI';
+            this.style.opacity = gameState.aiMode ? '1' : '0.7';
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', function() {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            this.textContent = gameState.soundEnabled ? '🔊 Sound On' : '🔇 Sound Off';
+        });
+
+        // AI move interval
+        setInterval(() => {
+            if (gameState.aiMode && Math.random() < 0.5) {
+                performAIMove();
+            }
+        }, 1500);
+
+        // Main game loop
+        let lastTime = 0;
+        // Main game loop
+        function gameLoop(timestamp) {
+            const delta = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, CONSTANTS.width, CONSTANTS.height);
+
+            // Draw everything
+            drawBackground();
+            drawPitchLines();
+            drawGoalNets();
+            drawBorders();
+            drawNails();
+            drawBall();
+            drawAimLine();
+            updateParticles();
+
+            // Update physics
+            if (!gameState.matchOver) {
+                updateBall();
+
+                // Check if turn should end (ball at rest)
+                if (gameState.isTurnActive && !gameState.goalScoredThisTurn) {
+                    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                    if (speed < CONSTANTS.restThreshold) {
+                        gameState.restAccum += delta;
+                        if (gameState.restAccum >= CONSTANTS.restTime) {
+                            gameState.isTurnActive = false;
+                            gameState.restAccum = 0;
+                            gameState.currentPlayer = gameState.currentPlayer === 'A' ? 'B' : 'A';
+                            updateTurnIndicator();
+                        }
+                    } else {
+                        gameState.restAccum = 0;
+                    }
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start game
+        updateTurnIndicator();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
